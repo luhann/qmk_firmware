@@ -24,3 +24,6 @@
 
 /* Enable caps-lock LED */
 #define CAPS_LOCK_LED_INDEX 45
+
+/* Enable caps word */
+#define BOTH_SHIFTS_TURNS_ON_CAPS_WORD
