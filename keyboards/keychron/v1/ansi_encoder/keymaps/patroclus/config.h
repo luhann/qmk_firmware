@@ -11,7 +11,9 @@
 /* Caps lock is unused, so drop the caps lock indicator */
 #undef CAPS_LOCK_LED_INDEX
 
-/* Only keep the typing heatmap and solid reactive simple effects */
+/* No RGB effects, the LEDs are only used for status lights */
+#undef ENABLE_RGB_MATRIX_TYPING_HEATMAP
+#undef ENABLE_RGB_MATRIX_SOLID_REACTIVE_SIMPLE
 #undef ENABLE_RGB_MATRIX_BREATHING
 #undef ENABLE_RGB_MATRIX_BAND_SPIRAL_VAL
 #undef ENABLE_RGB_MATRIX_CYCLE_ALL

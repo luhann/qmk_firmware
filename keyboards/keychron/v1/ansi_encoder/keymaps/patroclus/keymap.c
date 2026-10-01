@@ -71,8 +71,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [COLEMAK_FN] = LAYOUT_ansi_82(
         QK_BOOT,  KC_F1,    KC_F2,    KC_F3,    KC_F4,    KC_F5,    KC_F6,    KC_F7,    KC_F8,    KC_F9,    KC_F10,   KC_F11,     KC_F12,   KC_SLEP,            _______,
         DM_PLY1,  DM_REC1,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,    _______,  _______,            _______,
-        RM_TOGG,  RM_NEXT, RM_VALU,  RM_HUEU,  RM_SATU,  RM_SPDU,  _______,  _______,  _______,  _______,  _______,  _______,    _______,  _______,            _______,
-        _______,  RM_PREV, RM_VALD,  RM_HUED,  RM_SATD,  RM_SPDD,  _______,  KC_UP,  KC_DOWN,  KC_LEFT,  KC_RGHT,  _______,              _______,            _______,
+        RM_TOGG,  _______,  RM_VALU,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,    _______,  _______,            _______,
+        _______,  _______,  RM_VALD,  _______,  _______,  _______,  _______,  KC_UP,  KC_DOWN,  KC_LEFT,  KC_RGHT,  _______,              _______,            _______,
         _______,            _______,  _______,  _______,  _______,  _______,  NK_TOGG,  _______,  _______,  _______,  _______,              _______,  _______,
         _______,  _______,  _______,                                QK_LLCK,                                KC_SYRQ,  _______,    _______,  _______,  _______,  _______),
 
@@ -87,8 +87,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [ALT_FN] = LAYOUT_ansi_82(
         QK_BOOT,  KC_BRID,  KC_BRIU,  KC_TASK,  KC_FLXP,  KC_BRID,  KC_BRIU,  KC_MPRV,  KC_MPLY,  KC_MNXT,  KC_MUTE,  KC_VOLD,    KC_VOLU,  KC_SLEP,            _______,
         DM_PLY1,  DM_REC1,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,    _______,  _______,            _______,
-        RM_TOGG,  RM_NEXT, RM_VALU,  RM_HUEU,  RM_SATU,  RM_SPDU,  _______,  _______,  _______,  _______,  _______,  _______,    _______,  _______,            _______,
-        _______,  RM_PREV, RM_VALD,  RM_HUED,  RM_SATD,  RM_SPDD,  _______,  _______,  _______,  _______,  _______,  _______,              _______,            _______,
+        RM_TOGG,  _______,  RM_VALU,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,    _______,  _______,            _______,
+        _______,  _______,  RM_VALD,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,  _______,              _______,            _______,
         _______,            _______,  _______,  _______,  _______,  _______,  NK_TOGG,  _______,  _______,  _______,  _______,              _______,  _______,
         _______,  _______,  _______,                                QK_LLCK,                                KC_SYRQ,  _______,    _______,  _______,  _______,  _______),
 };
@@ -104,6 +104,14 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 
 #if defined(RGB_MATRIX_ENABLE)
 static bool macro_recording = false;
+
+void keyboard_post_init_user(void) {
+    // Solid colour is the only effect, and a mode saved by an older build would
+    // stop rendering (and the status lights) after the first block of LEDs
+    if (rgb_matrix_get_mode() != RGB_MATRIX_SOLID_COLOR) {
+        rgb_matrix_mode(RGB_MATRIX_SOLID_COLOR);
+    }
+}
 
 bool dynamic_macro_record_start_user(int8_t direction) {
     macro_recording = true;
@@ -139,6 +147,11 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     bool    fn_active = layer_state_is(fn);
     bool    blink_on  = timer_read() & 0x100;
 
+    // Keep the LEDs dark apart from the status lights below
+    for (uint8_t i = led_min; i < led_max; ++i) {
+        rgb_matrix_set_color(i, RGB_OFF);
+    }
+
     for (uint8_t row = 0; row < MATRIX_ROWS; ++row) {
         for (uint8_t col = 0; col < MATRIX_COLS; ++col) {
             uint8_t index = g_led_config.matrix_co[row][col];
@@ -152,18 +165,12 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
                 // Blink the record key while a macro is recording
                 if (blink_on) {
                     set_key_hsv(index, (hsv_t){HSV_RED});
-                } else {
-                    rgb_matrix_set_color(index, RGB_OFF);
                 }
             } else if (is_caps_word_on() && (base_kc == SC_LSPO || base_kc == SC_RSPC)) {
                 set_key_hsv(index, (hsv_t){HSV_WHITE});
-            } else if (fn_active) {
-                // While Fn is held or locked, only light keys that do something
-                if (fn_kc > KC_TRNS) {
-                    set_key_hsv(index, fn_key_hsv(fn_kc));
-                } else {
-                    rgb_matrix_set_color(index, RGB_OFF);
-                }
+            } else if (fn_active && fn_kc > KC_TRNS) {
+                // While Fn is held or locked, light the keys that do something
+                set_key_hsv(index, fn_key_hsv(fn_kc));
             }
         }
     }
