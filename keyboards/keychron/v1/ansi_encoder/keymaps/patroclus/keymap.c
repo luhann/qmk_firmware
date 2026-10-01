@@ -66,7 +66,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         KC_TAB,   KC_Q,     KC_W,     KC_F,     KC_P,     KC_B,     KC_J,     KC_L,     KC_U,     KC_Y,     KC_SCLN,  KC_LBRC,    KC_RBRC,  TD(TD_PIPE),        KC_PGDN,
         KC_LGUI,  KC_A,     KC_R,     KC_S,     KC_T,     KC_G,     KC_M,     KC_N,     KC_E,     KC_I,     KC_O,     KC_QUOT,              KC_ENT,             TD(TD_HOME),
         SC_LSPO,            KC_X,     KC_C,     KC_D,     KC_V,     KC_Z,     KC_K,     KC_H,     KC_COMM,  KC_DOT,   KC_SLSH,              SC_RSPC,  KC_UP,
-        KC_LCTL,  MO(COLEMAK_FN),  KC_RGHT,                                KC_SPC,                                 KC_RCMD,  MO(COLEMAK_FN), KC_RCTL,  KC_LEFT,  KC_DOWN,  KC_RGHT),
+        KC_LCTL,  MO(COLEMAK_FN),  KC_RGHT,                                KC_SPC,                                 QK_REP,   MO(COLEMAK_FN), KC_RCTL,  KC_LEFT,  KC_DOWN,  KC_RGHT),
 
     [COLEMAK_FN] = LAYOUT_ansi_82(
         QK_BOOT,  KC_F1,    KC_F2,    KC_F3,    KC_F4,    KC_F5,    KC_F6,    KC_F7,    KC_F8,    KC_F9,    KC_F10,   KC_F11,     KC_F12,   KC_SLEP,            _______,
@@ -74,7 +74,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         RM_TOGG,  RM_NEXT, RM_VALU,  RM_HUEU,  RM_SATU,  RM_SPDU,  _______,  _______,  _______,  _______,  _______,  _______,    _______,  _______,            _______,
         _______,  RM_PREV, RM_VALD,  RM_HUED,  RM_SATD,  RM_SPDD,  _______,  KC_UP,  KC_DOWN,  KC_LEFT,  KC_RGHT,  _______,              _______,            _______,
         _______,            _______,  _______,  _______,  _______,  _______,  NK_TOGG,  _______,  _______,  _______,  _______,              _______,  _______,
-        _______,  _______,  _______,                                _______,                                KC_SYRQ,  _______,    _______,  _______,  _______,  _______),
+        _______,  _______,  _______,                                QK_LLCK,                                KC_SYRQ,  _______,    _______,  _______,  _______,  _______),
 
     [ALT] = LAYOUT_ansi_82(
         KC_ESC,   KC_F1,    KC_F2,    KC_F3,    KC_F4,    KC_F5,    KC_F6,    KC_F7,    KC_F8,    KC_F9,    KC_F10,   KC_F11,     KC_F12,   KC_DEL,             KC_MUTE,
@@ -90,7 +90,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         RM_TOGG,  RM_NEXT, RM_VALU,  RM_HUEU,  RM_SATU,  RM_SPDU,  _______,  _______,  _______,  _______,  _______,  _______,    _______,  _______,            _______,
         _______,  RM_PREV, RM_VALD,  RM_HUED,  RM_SATD,  RM_SPDD,  _______,  _______,  _______,  _______,  _______,  _______,              _______,            _______,
         _______,            _______,  _______,  _______,  _______,  _______,  NK_TOGG,  _______,  _______,  _______,  _______,              _______,  _______,
-        _______,  _______,  _______,                                _______,                                KC_SYRQ,  _______,    _______,  _______,  _______,  _______),
+        _______,  _______,  _______,                                QK_LLCK,                                KC_SYRQ,  _______,    _______,  _______,  _______,  _______),
 };
 
 #if defined(ENCODER_MAP_ENABLE)
@@ -101,3 +101,72 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
     [ALT_FN]   = { ENCODER_CCW_CW(RM_VALD, RM_VALU)}
 };
 #endif // ENCODER_MAP_ENABLE
+
+#if defined(RGB_MATRIX_ENABLE)
+static bool macro_recording = false;
+
+bool dynamic_macro_record_start_user(int8_t direction) {
+    macro_recording = true;
+    return true;
+}
+
+bool dynamic_macro_record_end_user(int8_t direction) {
+    macro_recording = false;
+    return true;
+}
+
+// Set a key's LED to the given colour at the current RGB brightness
+static void set_key_hsv(uint8_t index, hsv_t hsv) {
+    hsv.v     = rgb_matrix_get_val();
+    rgb_t rgb = hsv_to_rgb(hsv);
+    rgb_matrix_set_color(index, rgb.r, rgb.g, rgb.b);
+}
+
+// Colour for an Fn layer key, grouped by what it does
+static hsv_t fn_key_hsv(uint16_t keycode) {
+    if (keycode == QK_BOOT) return (hsv_t){HSV_RED};
+    if (keycode == QK_LLCK) return (hsv_t){HSV_GREEN};
+    if (keycode >= KC_RGHT && keycode <= KC_UP) return (hsv_t){HSV_WHITE};
+    if (IS_RGB_MATRIX_KEYCODE(keycode)) return (hsv_t){HSV_MAGENTA};
+    if (keycode >= QK_DYNAMIC_MACRO_RECORD_START_1 && keycode <= QK_DYNAMIC_MACRO_PLAY_2) return (hsv_t){HSV_ORANGE};
+    return (hsv_t){HSV_AZURE};
+}
+
+bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+    // Each base layer's Fn layer directly follows it in the layer enum
+    uint8_t base      = get_highest_layer(default_layer_state);
+    uint8_t fn        = base + 1;
+    bool    fn_active = layer_state_is(fn);
+    bool    blink_on  = timer_read() & 0x100;
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; ++row) {
+        for (uint8_t col = 0; col < MATRIX_COLS; ++col) {
+            uint8_t index = g_led_config.matrix_co[row][col];
+            if (index == NO_LED || index < led_min || index >= led_max) continue;
+
+            keypos_t pos     = {.col = col, .row = row};
+            uint16_t base_kc = keymap_key_to_keycode(base, pos);
+            uint16_t fn_kc   = keymap_key_to_keycode(fn, pos);
+
+            if (macro_recording && fn_kc == DM_REC1) {
+                // Blink the record key while a macro is recording
+                if (blink_on) {
+                    set_key_hsv(index, (hsv_t){HSV_RED});
+                } else {
+                    rgb_matrix_set_color(index, RGB_OFF);
+                }
+            } else if (is_caps_word_on() && (base_kc == SC_LSPO || base_kc == SC_RSPC)) {
+                set_key_hsv(index, (hsv_t){HSV_WHITE});
+            } else if (fn_active) {
+                // While Fn is held or locked, only light keys that do something
+                if (fn_kc > KC_TRNS) {
+                    set_key_hsv(index, fn_key_hsv(fn_kc));
+                } else {
+                    rgb_matrix_set_color(index, RGB_OFF);
+                }
+            }
+        }
+    }
+    return false;
+}
+#endif // RGB_MATRIX_ENABLE
